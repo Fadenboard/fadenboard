@@ -1,47 +1,37 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
- process.env.NEXT_PUBLIC_SUPABASE_URL!,
- process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export async function POST(req: Request) {
- const { name, description } = await req.json();
+const supabase = createClient(supabaseUrl, supabaseAnon);
 
- if (!name) {
-   return NextResponse.json(
-     { error: "Board name required" },
-     { status: 400 }
-   );
- }
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const slug = searchParams.get("slug");
 
- const slug = name
-   .toLowerCase()
-   .replace(/[^a-z0-9]+/g, "-")
-   .replace(/(^-|-$)/g, "");
+  if (slug) {
+    const { data, error } = await supabase
+      .from("boards")
+      .select("*")
+      .eq("slug", slug)
+      .single();
 
- const {
-   data: { user },
- } = await supabase.auth.getUser();
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
 
- if (!user) {
-   return NextResponse.json(
-     { error: "Not authenticated" },
-     { status: 401 }
-   );
- }
+    return NextResponse.json({ board: data });
+  }
 
- const { error } = await supabase.from("boards").insert({
-   name,
-   slug,
-   description,
-   created_by: user.id,
- });
+  const { data, error } = await supabase
+    .from("boards")
+    .select("*")
+    .order("created_at", { ascending: false });
 
- if (error) {
-   return NextResponse.json({ error: error.message }, { status: 500 });
- }
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
- return NextResponse.json({ success: true });
+  return NextResponse.json({ boards: data });
 }
