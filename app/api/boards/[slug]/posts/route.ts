@@ -3,24 +3,30 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-function sb() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!;
+function supabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  // Prefer service role on the server. Fallback to anon if you haven't added it yet.
+  const key = serviceKey || anonKey;
+  if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { slug: string } }
-) {
-  const supabase = sb();
+type Ctx = { params: { slug: string } };
 
+export async function GET(_req: Request, { params }: Ctx) {
+  const supabase = supabaseAdmin();
+  const slug = params.slug;
+
+  // Find board by slug
   const { data: board, error: boardErr } = await supabase
     .from("boards")
-    .select("id")
-    .eq("slug", params.slug)
+    .select("id, slug")
+    .eq("slug", slug)
     .maybeSingle();
 
   if (boardErr) {
@@ -30,25 +36,30 @@ export async function GET(
     return NextResponse.json({ error: "Board not found" }, { status: 404 });
   }
 
-  const { data: posts, error } = await supabase
+  // Load posts for that board
+  const { data: posts, error: postsErr } = await supabase
     .from("posts")
-    .select("id,title,body,author,created_at,board_id")
+    .select("id, board_id, title, body, author, created_at")
     .eq("board_id", board.id)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (postsErr) {
+    return NextResponse.json({ error: postsErr.message }, { status: 500 });
   }
 
   return NextResponse.json({ posts: posts ?? [] }, { status: 200 });
 }
 
-export async function POST(
-  req: Request,
-  { params }: { params: { slug: string } }
-) {
-  const supabase = sb();
-  const payload = await req.json();
+export async function POST(req: Request, { params }: Ctx) {
+  const supabase = supabaseAdmin();
+  const slug = params.slug;
+
+  let payload: any = {};
+  try {
+    payload = await req.json();
+  } catch {
+    payload = {};
+  }
 
   const title = String(payload?.title ?? "").trim();
   const body = payload?.body == null ? null : String(payload.body).trim();
@@ -58,10 +69,11 @@ export async function POST(
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
   }
 
+  // Find board by slug
   const { data: board, error: boardErr } = await supabase
     .from("boards")
-    .select("id")
-    .eq("slug", params.slug)
+    .select("id, slug")
+    .eq("slug", slug)
     .maybeSingle();
 
   if (boardErr) {
@@ -71,7 +83,8 @@ export async function POST(
     return NextResponse.json({ error: "Board not found" }, { status: 404 });
   }
 
-  const { data: post, error } = await supabase
+  // Insert post
+  const { data: post, error: insertErr } = await supabase
     .from("posts")
     .insert({
       board_id: board.id,
@@ -79,12 +92,13 @@ export async function POST(
       body,
       author,
     })
-    .select("id,title,body,author,created_at,board_id")
+    .select("id, board_id, title, body, author, created_at")
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (insertErr) {
+    return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
 
   return NextResponse.json({ post }, { status: 201 });
 }
+
