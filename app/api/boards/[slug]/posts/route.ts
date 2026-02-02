@@ -6,12 +6,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-type Ctx = { params: { slug: string } };
+// Next/Vercel types sometimes treat params as Promise-like.
+// This handles both shapes safely.
+type Params = { slug: string };
+type Ctx = { params: Params | Promise<Params> };
 
 export async function GET(_req: Request, ctx: Ctx) {
-  const { slug } = ctx.params;
+  const { slug } = await ctx.params;
 
-  // 1) Find the board by slug
   const { data: board, error: boardError } = await supabase
     .from("boards")
     .select("id, name, slug")
@@ -25,7 +27,6 @@ export async function GET(_req: Request, ctx: Ctx) {
     );
   }
 
-  // 2) Fetch posts for that board
   const { data: posts, error: postsError } = await supabase
     .from("posts")
     .select("*")
