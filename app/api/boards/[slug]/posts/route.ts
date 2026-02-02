@@ -96,4 +96,4 @@ export async function POST(req: NextRequest, context: RouteContext) {
   return NextResponse.json({ post }, { status: 201 });
 }
 
-}
+
