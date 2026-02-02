@@ -1,68 +1,47 @@
 ﻿import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-/**
- * TEMP in-memory store (safe for dev).
- * If you're using Supabase or DB already,
- * replace this with your DB calls.
- */
-let BOARDS: {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  created_at: string;
-}[] = [];
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-/**
- * GET /api/boards
- * Returns all boards
- */
 export async function GET() {
-  return NextResponse.json({
-    boards: BOARDS,
-  });
-}
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-/**
- * POST /api/boards
- * Body: { name, slug, description? }
- */
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { name, slug, description } = body ?? {};
-
-    if (!name || !slug) {
-      return NextResponse.json(
-        { error: "Name and slug are required" },
-        { status: 400 }
-      );
-    }
-
-    // Prevent duplicates
-    const exists = BOARDS.find((b) => b.slug === slug);
-    if (exists) {
-      return NextResponse.json(
-        { error: "Board with this slug already exists" },
-        { status: 409 }
-      );
-    }
-
-    const board = {
-      id: crypto.randomUUID(),
-      name: String(name),
-      slug: String(slug),
-      description: description ? String(description) : null,
-      created_at: new Date().toISOString(),
-    };
-
-    BOARDS.unshift(board);
-
-    return NextResponse.json(board, { status: 201 });
-  } catch (err) {
+  // If this returns 500 with "Missing env", Vercel isn't injecting your env vars
+  if (!url) {
     return NextResponse.json(
-      { error: "Invalid JSON or server error" },
+      { error: "Missing env: NEXT_PUBLIC_SUPABASE_URL" },
       { status: 500 }
     );
   }
+  if (!serviceKey) {
+    return NextResponse.json(
+      { error: "Missing env: SUPABASE_SERVICE_ROLE_KEY" },
+      { status: 500 }
+    );
+  }
+
+  const supabase = createClient(url, serviceKey, {
+    auth: { persistSession: false },
+  });
+
+  const { data, error } = await supabase
+    .from("boards")
+    .select("id,name,slug,description,created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json(
+      { error: error.message, details: error },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    usedServiceRole: true,
+    count: data?.length ?? 0,
+    boards: data ?? [],
+  });
 }
