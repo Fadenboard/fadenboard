@@ -1,37 +1,68 @@
 ﻿import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+/**
+ * TEMP in-memory store (safe for dev).
+ * If you're using Supabase or DB already,
+ * replace this with your DB calls.
+ */
+let BOARDS: {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  created_at: string;
+}[] = [];
 
-const supabase = createClient(supabaseUrl, supabaseAnon);
+/**
+ * GET /api/boards
+ * Returns all boards
+ */
+export async function GET() {
+  return NextResponse.json({
+    boards: BOARDS,
+  });
+}
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const slug = searchParams.get("slug");
+/**
+ * POST /api/boards
+ * Body: { name, slug, description? }
+ */
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { name, slug, description } = body ?? {};
 
-  if (slug) {
-    const { data, error } = await supabase
-      .from("boards")
-      .select("*")
-      .eq("slug", slug)
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    if (!name || !slug) {
+      return NextResponse.json(
+        { error: "Name and slug are required" },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ board: data });
+    // Prevent duplicates
+    const exists = BOARDS.find((b) => b.slug === slug);
+    if (exists) {
+      return NextResponse.json(
+        { error: "Board with this slug already exists" },
+        { status: 409 }
+      );
+    }
+
+    const board = {
+      id: crypto.randomUUID(),
+      name: String(name),
+      slug: String(slug),
+      description: description ? String(description) : null,
+      created_at: new Date().toISOString(),
+    };
+
+    BOARDS.unshift(board);
+
+    return NextResponse.json(board, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Invalid JSON or server error" },
+      { status: 500 }
+    );
   }
-
-  const { data, error } = await supabase
-    .from("boards")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ boards: data });
 }
