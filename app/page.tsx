@@ -40,7 +40,7 @@ export default function HomePage() {
         throw new Error(`GET /api/boards failed: ${res.status} ${txt}`);
       }
       const data = await res.json();
-      setBoards(Array.isArray(data?.boards) ? data.boards : []);
+      setBoards(Array.isArray(data) ? data : Array.isArray(data?.boards) ? data.boards : []);
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load boards");
     } finally {
@@ -91,7 +91,7 @@ export default function HomePage() {
         <div className="flagbar" />
         <h1 className="h-title">Faden Boards</h1>
         <p className="h-sub">
-          Create a board (a “Faden”), then jump in. Dark, fast, and built to scale.
+          Create a board (a “Faden”), then jump in. American, MAGA, and AMERICA FIRST!
         </p>
 
         <div className="badge-row">
