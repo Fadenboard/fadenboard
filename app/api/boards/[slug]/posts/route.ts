@@ -1,43 +1,43 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs";
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { slug: string } }
-) {
-  try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+type Ctx = { params: { slug: string } };
 
-    if (!url || !anon) {
-      return NextResponse.json(
-        { ok: false, error: "Missing SUPABASE env vars" },
-        { status: 500 }
-      );
-    }
+export async function GET(_req: Request, ctx: Ctx) {
+  const { slug } = ctx.params;
 
-    const supabase = createClient(url, anon);
+  // 1) Find the board by slug
+  const { data: board, error: boardError } = await supabase
+    .from("boards")
+    .select("id, name, slug")
+    .eq("slug", slug)
+    .single();
 
-    const { data, error } = await supabase
-      .from("boards")
-      .select("id,name,slug,description,created_at")
-      .eq("slug", params.slug)
-      .single();
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ ok: true, board: data });
-  } catch (e: any) {
+  if (boardError || !board) {
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
+      { ok: false, error: boardError?.message ?? "Board not found" },
+      { status: 404 }
+    );
+  }
+
+  // 2) Fetch posts for that board
+  const { data: posts, error: postsError } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("board_id", board.id)
+    .order("created_at", { ascending: false });
+
+  if (postsError) {
+    return NextResponse.json(
+      { ok: false, error: postsError.message },
       { status: 500 }
     );
   }
+
+  return NextResponse.json({ ok: true, board, posts: posts ?? [] });
 }
