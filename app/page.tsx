@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useMemo, useState } from "react";
 
 type Board = {
@@ -7,7 +9,7 @@ type Board = {
   name: string;
   slug: string;
   description: string | null;
-  is_pinned: boolean;
+  is_pinned?: boolean;
   created_at: string;
 };
 
@@ -33,16 +35,20 @@ export default function HomePage() {
   async function loadBoards() {
     setLoading(true);
     setErr(null);
+
     try {
       const res = await fetch("/api/boards", { cache: "no-store" });
       if (!res.ok) {
         const txt = await res.text();
         throw new Error(`GET /api/boards failed: ${res.status} ${txt}`);
       }
+
       const data = await res.json();
-      setBoards(Array.isArray(data) ? data : Array.isArray(data?.boards) ? data.boards : []);
+      const list = Array.isArray(data?.boards) ? data.boards : [];
+      setBoards(list);
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load boards");
+      setBoards([]);
     } finally {
       setLoading(false);
     }
@@ -52,20 +58,20 @@ export default function HomePage() {
     e.preventDefault();
     setErr(null);
 
-    const payload = {
-      name: name.trim(),
-      slug,
-      description: description.trim() || null,
-    };
-
-    if (!payload.name) return setErr("Board name is required.");
-    if (!payload.slug) return setErr("Slug is required.");
+    if (!name.trim()) {
+      setErr("Board name is required.");
+      return;
+    }
 
     try {
       const res = await fetch("/api/boards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: name.trim(),
+          slug,
+          description: description.trim() ? description.trim() : null,
+        }),
       });
 
       if (!res.ok) {
@@ -86,105 +92,246 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main className="faden-shell">
-      <section className="hero">
-        <div className="flagbar" />
-        <h1 className="h-title">Faden Boards</h1>
-        <p className="h-sub">
-          Create a board (a “Faden”), then jump in. American, MAGA, and AMERICA FIRST!
-        </p>
-
-        <div className="badge-row">
-          <span className="pill">🟥 Red intent</span>
-          <span className="pill">⬜ Clean signal</span>
-          <span className="pill">🟦 Blue clarity</span>
-          <span className="pill">⭐ Starfield UI</span>
+    <main
+      style={{
+        minHeight: "100vh",
+        padding: "48px 18px",
+        color: "white",
+        background:
+          "radial-gradient(1200px 600px at 25% 20%, rgba(120,0,0,0.35), transparent 60%), radial-gradient(1200px 600px at 75% 20%, rgba(0,60,255,0.20), transparent 60%), radial-gradient(900px 500px at 50% 70%, rgba(255,255,255,0.06), transparent 60%), linear-gradient(180deg, #06080f, #02040a)",
+      }}
+    >
+      <div style={{ maxWidth: 980, margin: "0 auto" }}>
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ fontSize: 12, letterSpacing: 2, opacity: 0.65 }}>
+            FADEN BOARDS
+          </div>
+          <h1 style={{ fontSize: 44, margin: "10px 0 10px" }}>Boards</h1>
+          <p style={{ opacity: 0.75, maxWidth: 720, lineHeight: 1.5 }}>
+            Create a board, share ideas, and jump in.
+          </p>
         </div>
-      </section>
 
-      <div style={{ height: 16 }} />
+        {err && (
+          <div
+            style={{
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(255,0,0,0.10)",
+              padding: 12,
+              borderRadius: 10,
+              marginBottom: 16,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {err}
+          </div>
+        )}
 
-      <section className="grid">
-        {/* Create */}
-        <div className="card">
-          <div className="card-inner">
-            <h2 className="card-title">Create a board</h2>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 18,
+          }}
+        >
+          {/* CREATE */}
+          <section
+            style={{
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.05)",
+              borderRadius: 14,
+              padding: 18,
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Create a board</h2>
+              <div style={{ opacity: 0.55, fontSize: 12, letterSpacing: 1 }}>
+                COMMAND · CREATE
+              </div>
+            </div>
 
-            <form onSubmit={createBoard}>
-              <div className="field">
-                <div className="label">Name</div>
-                <input
-                  className="input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Free Speech"
-                />
+            <p style={{ marginTop: 10, opacity: 0.75, lineHeight: 1.5 }}>
+              Name your space. Your slug becomes the URL.
+            </p>
+
+            <form onSubmit={createBoard} style={{ marginTop: 16 }}>
+              <label style={{ display: "block", fontSize: 12, opacity: 0.75 }}>
+                NAME
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="First Board"
+                style={{
+                  width: "100%",
+                  marginTop: 6,
+                  padding: "12px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  background: "rgba(0,0,0,0.35)",
+                  color: "white",
+                  outline: "none",
+                }}
+              />
+
+              <div style={{ height: 12 }} />
+
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <label style={{ display: "block", fontSize: 12, opacity: 0.75 }}>
+                  SLUG
+                </label>
+                <div style={{ fontSize: 12, opacity: 0.55 }}>auto</div>
               </div>
 
-              <div className="field">
-                <div className="label">Slug</div>
-                <input className="input" value={slug} readOnly placeholder="free-speech" />
-              </div>
+              <input
+                value={slug}
+                readOnly
+                style={{
+                  width: "100%",
+                  marginTop: 6,
+                  padding: "12px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  background: "rgba(0,0,0,0.25)",
+                  color: "rgba(255,255,255,0.85)",
+                  outline: "none",
+                }}
+              />
 
-              <div className="field">
-                <div className="label">Description (optional)</div>
-                <input
-                  className="input"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What is this board about?"
-                />
-              </div>
+              <div style={{ height: 12 }} />
 
-              <button className="btn btn-primary" type="submit">
-                <span>🚩</span>
-                <span>Create board</span>
+              <label style={{ display: "block", fontSize: 12, opacity: 0.75 }}>
+                DESCRIPTION
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What is this board about?"
+                rows={5}
+                style={{
+                  width: "100%",
+                  marginTop: 6,
+                  padding: "12px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  background: "rgba(0,0,0,0.35)",
+                  color: "white",
+                  outline: "none",
+                  resize: "vertical",
+                }}
+              />
+
+              <button
+                type="submit"
+                style={{
+                  width: "100%",
+                  marginTop: 14,
+                  padding: "12px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "white",
+                  color: "black",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Create board
               </button>
             </form>
+          </section>
 
-            {err && <div className="error">{err}</div>}
-            <div className="hr" />
-            <div className="small">
-              Tip: name automatically generates the slug. Keep it clean, keep it sharp.
-            </div>
-          </div>
-        </div>
-
-        {/* Boards */}
-        <div className="card">
-          <div className="card-inner">
-            <div className="section-head">
-              <h2 className="card-title" style={{ margin: 0 }}>Boards</h2>
-              <button className="btn btn-ghost" onClick={loadBoards} type="button">
-                ↻ Refresh
+          {/* LIST */}
+          <section
+            style={{
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.05)",
+              borderRadius: 14,
+              padding: 18,
+              backdropFilter: "blur(10px)",
+              minHeight: 320,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Boards</h2>
+              <button
+                onClick={loadBoards}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(0,0,0,0.25)",
+                  color: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Refresh
               </button>
             </div>
 
-            {loading ? (
-              <p className="small">Loading…</p>
-            ) : boards.length === 0 ? (
-              <p className="small">No boards yet. Make the first one.</p>
-            ) : (
-              <div className="boards">
-                {boards.map((b) => (
-                  <div className="board" key={b.id}>
-                    <div className="board-top">
-                      <div className="board-name">{b.name}</div>
-                      <div className="board-slug">/b/{b.slug}</div>
-                    </div>
+            <div style={{ marginTop: 14 }}>
+              {loading ? (
+                <p style={{ opacity: 0.7 }}>Loading…</p>
+              ) : boards.length === 0 ? (
+                <p style={{ opacity: 0.7 }}>No boards found.</p>
+              ) : (
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {boards.map((b) => (
+                    <li
+                      key={b.id}
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        background: "rgba(0,0,0,0.22)",
+                        borderRadius: 12,
+                        padding: 14,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 800 }}>{b.name}</div>
+                          <div style={{ fontSize: 12, opacity: 0.7 }}>
+                            /{b.slug}
+                          </div>
+                        </div>
 
-                    {b.description && <div className="board-desc">{b.description}</div>}
+                        <a
+                          href={`/boards/${b.slug}`}
+                          style={{
+                            color: "white",
+                            opacity: 0.9,
+                            textDecoration: "none",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Open →
+                        </a>
+                      </div>
 
-                    <a className="link" href={`/b/${b.slug}`}>
-                      Open board →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                      {b.description ? (
+                        <p style={{ margin: "10px 0 0", opacity: 0.75 }}>
+                          {b.description}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
         </div>
-      </section>
+
+        <div style={{ marginTop: 18, opacity: 0.55, fontSize: 12 }}>
+          Tip: your board URL is <b>/boards/&lt;slug&gt;</b>
+        </div>
+      </div>
     </main>
   );
 }
