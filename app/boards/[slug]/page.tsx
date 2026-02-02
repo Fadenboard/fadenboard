@@ -1,117 +1,67 @@
-// app/boards/[slug]/page.tsx
-import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
-
-type Props = {
-    // Next.js versions differ: sometimes params is sync, sometimes it's a Promise.
-    params: { slug: string } | Promise<{ slug: string }>;
-};
-
-type Board = {
-    id: string;
-    name: string;
-    slug: string;
-    description: string | null;
-    created_at: string;
-};
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-function normalizeSlug(input: string) {
-    return decodeURIComponent(input || "")
-        .trim()
-        .replace(/^\/+/, "") // remove leading slashes
-        .toLowerCase();
-}
+type Props = {
+    params: { slug: string };
+};
 
 export default async function BoardPage({ params }: Props) {
-    const resolved = await Promise.resolve(params);
-    const slug = normalizeSlug(resolved?.slug ?? "");
-
-    // If slug is still empty, the route isn't being hit correctly.
-    if (!slug) {
-        return (
-            <main style={{ padding: 24 }}>
-                <h1>Board not found</h1>
-                <p>Slug: (empty)</p>
-                <p style={{ opacity: 0.75 }}>
-                    This usually means params.slug is not being received. Confirm the folder
-                    path is <code>app/boards/[slug]/page.tsx</code>.
-                </p>
-                <p>
-                    <Link href="/boards">Back to boards</Link>
-                </p>
-            </main>
-        );
-    }
+    const slug = params.slug.toLowerCase();
 
     const { data: board, error } = await supabase
         .from("boards")
-        .select("id,name,slug,description,created_at")
+        .select("id, name, slug, description, created_at")
         .eq("slug", slug)
-        .maybeSingle<Board>();
+        .single();
 
-    if (error) {
+    if (error || !board) {
         return (
-            <main style={{ padding: 24 }}>
-                <h1>Board load error</h1>
-                <pre style={{ whiteSpace: "pre-wrap" }}>
-                    {JSON.stringify(error, null, 2)}
-                </pre>
-                <p>
-                    <Link href="/boards">Back to boards</Link>
-                </p>
-            </main>
-        );
-    }
-
-    if (!board) {
-        return (
-            <main style={{ padding: 24 }}>
+            <main style={{ padding: 40, color: "white" }}>
                 <h1>Board not found</h1>
+                <p>Slug: {slug}</p>
                 <p>
-                    Slug: <code>{slug}</code>
+                    If this slug should exist, check the <code>boards</code> table and
+                    confirm the slug matches exactly.
                 </p>
-                <p style={{ opacity: 0.75 }}>
-                    If this slug should exist, check Supabase table <code>boards</code> and
-                    confirm the row’s <code>slug</code> matches exactly (lowercase, no
-                    leading slash).
-                </p>
-                <p>
-                    <Link href="/boards">Back to boards</Link>
-                </p>
+                <Link href="/boards">Back to boards</Link>
             </main>
         );
     }
 
     return (
-        <main style={{ padding: 24 }}>
-            <p style={{ marginBottom: 12 }}>
-                <Link href="/boards">← Back to boards</Link>
-            </p>
+        <main
+            style={{
+                minHeight: "100vh",
+                padding: 40,
+                color: "white",
+                background:
+                    "radial-gradient(800px 400px at 50% 20%, rgba(255,255,255,0.08), transparent 60%), linear-gradient(180deg, #05070e, #02030a)",
+            }}
+        >
+            <div style={{ maxWidth: 900, margin: "0 auto" }}>
+                <Link href="/boards" style={{ opacity: 0.7 }}>
+                    ← Back to boards
+                </Link>
 
-            <h1 style={{ marginBottom: 6 }}>{board.name}</h1>
+                <h1 style={{ marginTop: 20, fontSize: 42 }}>{board.name}</h1>
 
-            <p style={{ opacity: 0.7, marginTop: 0 }}>
-                /{board.slug}
-            </p>
+                {board.description && (
+                    <p style={{ opacity: 0.8, marginTop: 12, lineHeight: 1.6 }}>
+                        {board.description}
+                    </p>
+                )}
 
-            {board.description ? (
-                <p style={{ marginTop: 16 }}>{board.description}</p>
-            ) : (
-                <p style={{ marginTop: 16, opacity: 0.7 }}>No description.</p>
-            )}
-
-            <hr style={{ margin: "24px 0", opacity: 0.2 }} />
-
-            <p style={{ opacity: 0.6, fontSize: 12 }}>
-                Created: {new Date(board.created_at).toLocaleString()}
-            </p>
+                <div style={{ marginTop: 30, opacity: 0.5, fontSize: 12 }}>
+                    Created {new Date(board.created_at).toLocaleString()}
+                </div>
+            </div>
         </main>
     );
 }
